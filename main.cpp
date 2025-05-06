@@ -5,7 +5,7 @@
 #include <string>
 #include <stdexcept>
 #include <algorithm> // Include this header for std::remove
-
+#include<vector>
 struct Instruction {
     std::string opcode;
     int size;
@@ -113,62 +113,71 @@ Instruction getOpcode(const std::string& mnemonic, const std::unordered_map<std:
 
 std::string parseLine(const std::string& line, const std::unordered_map<std::string, Instruction>& table) {
     std::string trimmedLine = line;
-
-    // Remove comments (anything after ';')
-    size_t commentPos = trimmedLine.find(';');
-    if (commentPos != std::string::npos) {
-        trimmedLine = trimmedLine.substr(0, commentPos);
-    }
-
-    // Trim leading and trailing whitespace
+    //remove  comments 
+    trimmedLine = line.substr(0,line.find( ';'));
+    //remove lead space 
     trimmedLine.erase(0, trimmedLine.find_first_not_of(" \t"));
-    trimmedLine.erase(trimmedLine.find_last_not_of(" \t") + 1);
-
-    if (trimmedLine.empty()) {
-        return ""; // Skip empty lines
+    //remove tail space
+    trimmedLine.erase(trimmedLine.find_last_not_of("/t")+1);
+    
+    if(trimmedLine.empty()){
+        return "";
     }
+    // extract mnemonic
+    std::istringstream iss (trimmedLine);
+    std:: string mnemonic ;
+    iss>>mnemonic;
+    // extract operand part
+    std::string operandPart;
+    std::getline(iss,operandPart);
+    
+    //remove the lead space 
+    operandPart.erase(operandPart.find_first_not_of("/t"));
 
-    std::istringstream iss(trimmedLine);
-    std::string mnemonic;
-    std::string operand;
+    //create vector for multiple operand like MOV A, B
+    std::vector<std::string>operands;
+    if(!operandPart.empty()){
+        //for operands separeted by commas
+        size_t commapos = operandPart.find(',');
+        if(commapos!=std::string::npos){
+            operands.push_back(operandPart.substr(0,commapos));
+            operands.push_back(operandPart.substr(commapos+1));
 
-    // Extract the mnemonic (first word)
-    iss >> mnemonic;
+        }
+        else {
+            operands.push_back(operandPart);
+        }
+        //trim space in operands
+        for(auto& op : operands)
+        {
+            op.erase(0,op.find_first_not_of("/t"));
+            op.erase(op.find_last_not_of("/t")+1);
 
-    // Handle special cases where mnemonic includes a comma (like "MOV A,B")
-    size_t commaPos = mnemonic.find(',');
-    if (commaPos != std::string::npos) {
-        // If comma is in mnemonic itself (like "A,B"), split it
-        operand = mnemonic.substr(commaPos + 1);
-        mnemonic = mnemonic.substr(0, commaPos);
-    } else {
-        // Otherwise, read the rest as operand
-        std::getline(iss, operand);
-        // Trim whitespace from operand
-        operand.erase(0, operand.find_first_not_of(" \t"));
-        operand.erase(operand.find_last_not_of(" \t") + 1);
-    }
-
-    try {
-        Instruction instr = getOpcode(mnemonic, table);
-
-        std::string machineCode = instr.opcode;
-
-        // Handle operands for instructions that need them
-        if (instr.size > 1 && !operand.empty()) {
-            // Remove 'H' suffix if present (hexadecimal)
-            if (operand.back() == 'H') {
-                operand.pop_back();
-            }
-            machineCode += " " + operand;
         }
 
-        return machineCode;
-    } catch (const std::exception& e) {
-        return "Error: " + std::string(e.what());
+       }
+
+       try{
+        Instruction instr = getOpcode(mnemonic,table);
+        std:: string machinecode = instr.opcode;
+
+        if(instr.size>1 && !operands.empty()){
+            for( const auto& op : operands){
+                std:: string proccessedOp= op;
+                if(proccessedOp.back()== 'H'){.
+                    proccessedOp.pop_back();
+
+                }
+                machinecode = " " + proccessedOp;
+            }
+        }
+     return machinecode;
+
+    }
+    catch (const std::exception& e){
+        return "Error" + std::string(e.what());
     }
 }
-
 void readAssemblyFile(const std::string& filename, const std::unordered_map<std::string, Instruction>& table) {
     std::ifstream file(filename);
     std::string line;

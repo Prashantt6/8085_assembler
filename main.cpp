@@ -227,6 +227,7 @@ void preprocessLabels(const std::string& filename, std::unordered_map<std::strin
 
 void readAssemblyFile(const std::string& filename, const std::unordered_map<std::string, Instruction>& table, const std::unordered_map<std::string, int>& labelTable) {
     std::ifstream file(filename);
+    std::ofstream outfile("output.hex");
     std::string line;
 
     if (file.is_open()) {
@@ -240,8 +241,10 @@ void readAssemblyFile(const std::string& filename, const std::unordered_map<std:
 
             std::string machineCode = parseLine(line, table, labelTable);
             std::cout << "Machine code for '" << line << "': " << machineCode << std::endl;
+            outfile << machineCode << std::endl; 
         }
         file.close();
+        outfile.close();
     } else {
         std::cerr << "Error: Could not open file!" << std::endl;
     }

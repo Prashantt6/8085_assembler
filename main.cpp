@@ -51,6 +51,7 @@ void initializeOpcodeTable(std::unordered_map<std::string, Instruction>& table) 
     table["SUB L"]    = {"95", 1};
     table["SUB M"]    = {"96", 1};
     table["SUB A"]    = {"97", 1};
+    table["INR A"]    = {"3C", 1};
     table["INR B"]    = {"04", 1};
     table["INR C"]    = {"0C", 1};
     table["INR D"]    = {"14", 1};
@@ -58,6 +59,7 @@ void initializeOpcodeTable(std::unordered_map<std::string, Instruction>& table) 
     table["INR H"]    = {"24", 1};
     table["INR L"]    = {"2C", 1};
     table["INR M"]    = {"34", 1};
+    table["DCR A"]    = {"3D", 1};
     table["DCR B"]    = {"05", 1};
     table["DCR C"]    = {"0D", 1};
     table["DCR D"]    = {"15", 1};

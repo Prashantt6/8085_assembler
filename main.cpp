@@ -4,15 +4,16 @@
 #include <sstream>
 #include <string>
 #include <stdexcept>
-#include <algorithm> // Include this header for std::remove
-#include<vector>
+#include <algorithm>
+#include <vector>
+#include <iomanip>
+
 struct Instruction {
     std::string opcode;
     int size;
 };
 
 void initializeOpcodeTable(std::unordered_map<std::string, Instruction>& table) {
-    // Initialize the opcode table (same as before)
     table["MOV A,B"]  = {"78", 1};
     table["MOV A,C"]  = {"79", 1};
     table["MOV A,D"]  = {"7A", 1};
@@ -104,37 +105,25 @@ void initializeOpcodeTable(std::unordered_map<std::string, Instruction>& table) 
 }
 
 Instruction getOpcode(const std::string& mnemonic, const std::unordered_map<std::string, Instruction>& table) {
-    if (table.find(mnemonic) != table.end()) {
-        return table.at(mnemonic);
-    } else {
-        throw std::runtime_error("Invalid instruction: " + mnemonic);
-    }
+    auto it = table.find(mnemonic);
+    if (it != table.end()) return it->second;
+    throw std::runtime_error("Invalid instruction: " + mnemonic);
 }
 
-std::string parseLine(const std::string& line, const std::unordered_map<std::string, Instruction>& table) {
-    std::string trimmedLine = line;
-    // Remove comments
-    trimmedLine = line.substr(0, line.find(';'));
-    // Remove leading spaces
+std::string parseLine(const std::string& line, const std::unordered_map<std::string, Instruction>& table, const std::unordered_map<std::string, int>& labelTable) {
+    std::string trimmedLine = line.substr(0, line.find(';'));
     trimmedLine.erase(0, trimmedLine.find_first_not_of(" \t"));
-    // Remove trailing spaces
     trimmedLine.erase(trimmedLine.find_last_not_of(" \t") + 1);
+    if (trimmedLine.empty()) return "";
 
-    if (trimmedLine.empty()) {
-        return "";
-    }
-
-    // Extract mnemonic
     std::istringstream iss(trimmedLine);
     std::string mnemonic;
     iss >> mnemonic;
 
-    // Extract operand part
     std::string operandPart;
     std::getline(iss, operandPart);
     operandPart.erase(0, operandPart.find_first_not_of(" \t"));
 
-    // Create vector for multiple operands like MOV A, B
     std::vector<std::string> operands;
     if (!operandPart.empty()) {
         size_t commapos = operandPart.find(',');
@@ -144,96 +133,112 @@ std::string parseLine(const std::string& line, const std::unordered_map<std::str
         } else {
             operands.push_back(operandPart);
         }
-
-        // Trim spaces in operands
         for (auto& op : operands) {
             op.erase(0, op.find_first_not_of(" \t"));
             op.erase(op.find_last_not_of(" \t") + 1);
         }
     }
 
-   // 🔑 Build full instruction string to match the table
-std::string fullMnemonic = mnemonic;
-if (!operands.empty()) {
-    fullMnemonic += " " + operands[0];
-    if (operands.size() > 1) {
-        fullMnemonic += "," + operands[1];
+    std::string fullMnemonic = mnemonic;
+    if (!operands.empty()) {
+        fullMnemonic += " " + operands[0];
+        if (operands.size() > 1) {
+            fullMnemonic += "," + operands[1];
+        }
     }
-}
 
-// 🌟 SPECIAL HANDLING for immediate/address instructions
-std::string lookupMnemonic;
-if ((mnemonic == "MVI") && operands.size() >= 1) {
-    // e.g., MVI A, 10H → lookup "MVI A,"
-    lookupMnemonic = mnemonic + " " + operands[0] + ",";
-} else if ((mnemonic == "LDA" || mnemonic == "STA" || mnemonic == "JMP" ||
-            mnemonic == "LHLD" || mnemonic == "SHLD" || mnemonic == "CALL" ||
-            mnemonic == "JC" || mnemonic == "JZ" || mnemonic == "JNZ" ||
-            mnemonic == "JM" || mnemonic == "JP" || mnemonic == "CC" ||
-            mnemonic == "CZ" || mnemonic == "CNZ" || mnemonic == "CM" ||
-            mnemonic == "CP")) {
-    // e.g., LDA 2050H → lookup "LDA"
-    lookupMnemonic = mnemonic;
-} else {
-    lookupMnemonic = fullMnemonic;
-}
+    std::string lookupMnemonic;
+    if ((mnemonic == "MVI") && operands.size() >= 1) {
+        lookupMnemonic = mnemonic + " " + operands[0] + ",";
+    } else if ((mnemonic == "LDA" || mnemonic == "STA" || mnemonic == "JMP" ||
+                mnemonic == "LHLD" || mnemonic == "SHLD" || mnemonic == "CALL" ||
+                mnemonic == "JC" || mnemonic == "JZ" || mnemonic == "JNZ" ||
+                mnemonic == "JM" || mnemonic == "JP" || mnemonic == "CC" ||
+                mnemonic == "CZ" || mnemonic == "CNZ" || mnemonic == "CM" ||
+                mnemonic == "CP")) {
+        lookupMnemonic = mnemonic;
+    } else {
+        lookupMnemonic = fullMnemonic;
+    }
 
-try {
     Instruction instr = getOpcode(lookupMnemonic, table);
     std::string machinecode = instr.opcode;
 
     if (instr.size > 1 && !operands.empty()) {
-        // Add operand bytes (if needed)
-        for (const auto& op : operands) {
+        for (auto& op : operands) {
             std::string processedOp = op;
             if (!processedOp.empty() && processedOp.back() == 'H') {
                 processedOp.pop_back();
             }
-            if(instr.size==2){
-                machinecode+= " " + processedOp;
+            if (labelTable.find(processedOp) != labelTable.end()) {
+                processedOp = std::to_string(labelTable.at(processedOp));
             }
-            else if (instr.size==3){
-                int address = std:: stoi(processedOp,nullptr,16);
+            std::stringstream ss;
+            ss << std::hex << std::uppercase;
+            if (instr.size == 2) {
+                int value = std::stoi(processedOp, nullptr, 16);
+                ss << std::setw(2) << std::setfill('0') << value;
+                machinecode += " " + ss.str();
+            } else if (instr.size == 3) {
+                int address = std::stoi(processedOp, nullptr, 16);
                 int lowbyte = address & 0xFF;
-                int highbyte = (address>>8) &0xFF;
-
-                std:: stringstream ss;
-                ss<< std:: hex << std:: uppercase;// Add low byte
-                ss.width(2); ss.fill('0');
-                ss << lowbyte;
+                int highbyte = (address >> 8) & 0xFF;
+                ss << std::setw(2) << std::setfill('0') << lowbyte;
                 machinecode += " " + ss.str();
-    
-                // Reset stream
                 ss.str(""); ss.clear();
-    
-                // Add high byte
-                ss.width(2); ss.fill('0');
-                ss << highbyte;
+                ss << std::setw(2) << std::setfill('0') << highbyte;
                 machinecode += " " + ss.str();
-            }
             }
         }
-        return machinecode;
-
     }
-   
+    return machinecode;
+}
 
- catch (const std::exception& e) {
-    return "Error: " + std::string(e.what());
+void preprocessLabels(const std::string& filename, std::unordered_map<std::string, int>& labelTable) {
+    std::ifstream file(filename);
+    std::string line;
+    int address = 0;
+
+    if (file.is_open()) {
+        while (std::getline(file, line)) {
+            std::string trimmedLine = line;
+            trimmedLine.erase(0, trimmedLine.find_first_not_of(" \t"));
+            if (trimmedLine.empty() || trimmedLine[0] == ';') continue;
+
+            size_t colonPos = trimmedLine.find(':');
+            if (colonPos != std::string::npos) {
+                std::string label = trimmedLine.substr(0, colonPos);
+                label.erase(label.find_last_not_of(" \t") + 1);
+                labelTable[label] = address;
+                trimmedLine = trimmedLine.substr(colonPos + 1);
+                trimmedLine.erase(0, trimmedLine.find_first_not_of(" \t"));
+            }
+
+            std::istringstream iss(trimmedLine);
+            std::string mnemonic;
+            iss >> mnemonic;
+            if (!mnemonic.empty()) {
+                address += 3; // assume worst-case (simplification)
+            }
+        }
+        file.close();
+    }
 }
-}
-void readAssemblyFile(const std::string& filename, const std::unordered_map<std::string, Instruction>& table) {
+
+void readAssemblyFile(const std::string& filename, const std::unordered_map<std::string, Instruction>& table, const std::unordered_map<std::string, int>& labelTable) {
     std::ifstream file(filename);
     std::string line;
 
     if (file.is_open()) {
         while (std::getline(file, line)) {
-            // Ignore empty lines or comments
-            if (line.empty() || line[0] == ';') {
-                continue;
+            if (line.empty() || line[0] == ';') continue;
+
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos) {
+                line = line.substr(colonPos + 1);
             }
 
-            std::string machineCode = parseLine(line, table);
+            std::string machineCode = parseLine(line, table, labelTable);
             std::cout << "Machine code for '" << line << "': " << machineCode << std::endl;
         }
         file.close();
@@ -244,26 +249,13 @@ void readAssemblyFile(const std::string& filename, const std::unordered_map<std:
 
 int main() {
     std::unordered_map<std::string, Instruction> opcodeTable;
+    std::unordered_map<std::string, int> labelTable;
     initializeOpcodeTable(opcodeTable);
 
-    // Read assembly file and parse it (example "program.asm")
-    readAssemblyFile("program.asm", opcodeTable);
+    std::string filename = "program.asm";
 
-    // Test it with a few instructions
-    std::string input = "MOV A,B";
-    try {
-        Instruction instr = getOpcode(input, opcodeTable);
-        std::cout << "Opcode for '" << input << "': "
-                  << instr.opcode << " (Size: " << instr.size << " bytes)" << std::endl;
-
-        input = "LDA";
-        instr = getOpcode(input, opcodeTable);
-        std::cout << "Opcode for '" << input << "': "
-                  << instr.opcode << " (Size: " << instr.size << " bytes)" << std::endl;
-
-    } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-    }
+    preprocessLabels(filename, labelTable);
+    readAssemblyFile(filename, opcodeTable, labelTable);
 
     return 0;
 }

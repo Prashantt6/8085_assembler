@@ -1,5 +1,6 @@
-MVI A,10H
-MOV B,A
-LDA 2050H
-ADD B
-HLT
+START:      MVI A, 32H
+            MVI B, 15H
+LOOP:       ADD B
+            DCR B
+            JNZ LOOP
+            HLT

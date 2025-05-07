@@ -189,12 +189,36 @@ try {
             if (!processedOp.empty() && processedOp.back() == 'H') {
                 processedOp.pop_back();
             }
-            machinecode += " " + processedOp;
-        }
-    }
-    return machinecode;
+            if(instr.size==2){
+                machinecode+= " " + processedOp;
+            }
+            else if (instr.size==3){
+                int address = std:: stoi(processedOp,nullptr,16);
+                int lowbyte = address & 0xFF;
+                int highbyte = (address>>8) &0xFF;
 
-} catch (const std::exception& e) {
+                std:: stringstream ss;
+                ss<< std:: hex << std:: uppercase;// Add low byte
+                ss.width(2); ss.fill('0');
+                ss << lowbyte;
+                machinecode += " " + ss.str();
+    
+                // Reset stream
+                ss.str(""); ss.clear();
+    
+                // Add high byte
+                ss.width(2); ss.fill('0');
+                ss << highbyte;
+                machinecode += " " + ss.str();
+            }
+            }
+        }
+        return machinecode;
+
+    }
+   
+
+ catch (const std::exception& e) {
     return "Error: " + std::string(e.what());
 }
 }

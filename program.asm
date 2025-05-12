@@ -1,9 +1,10 @@
-START:          ; Label for the start
-MVI A, 00H      ; Initialize A to 00H
-LOOP1:          ; Label for first loop
-    INR A       ; Increment A
-    JNZ LOOP1   ; Jump back to LOOP1 if A is not zero
-LOOP2:          ; Label for second loop
-    DCR A       ; Decrement A
-    JNZ LOOP2   ; Jump back to LOOP2 if A is not zero
-HLT              ; Halt the program
+MVI A, 15H
+MVI B, 05H
+MVI C, 00H
+AA : INR C 
+SUB B
+JNC AA
+DCR C 
+ADD B
+STA 9000H
+HLT
